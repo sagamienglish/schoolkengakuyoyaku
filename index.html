@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学校見学予約｜東海大学付属相模高等学校・中等部</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'sagami-blue': '#003366',
+                        'sagami-light': '#0050A0',
+                        'sagami-accent': '#e60012',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; background-color: #f8fafc; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        @media (max-width: 768px) {
+            .calendar-grid { gap: 2px; }
+            .date-cell { min-height: 100px; padding: 2px !important; }
+            .slot-btn { font-size: 0.65rem !important; padding: 0.25rem 0.1rem !important; margin-bottom: 2px !important; }
+        }
+        .slot-btn { transition: all 0.2s; }
+        .slot-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); filter: brightness(1.1); }
+        .slot-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* ローディング用アニメーション */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #003366;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-sagami-blue text-white shadow-md">
+        <div class="container mx-auto px-4 py-4 flex items-center justify-between">
+            <h1 class="text-xl md:text-2xl font-bold">夏期 学校見学予約システム</h1>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 max-w-5xl">
+        
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-8">
+            <h2 class="text-lg font-bold border-b-2 border-sagami-blue pb-2 mb-4 text-sagami-blue">
+                <i class="fas fa-info-circle mr-2"></i>ご案内と注意事項
+            </h2>
+            <ul class="list-disc list-inside text-sm md:text-base space-y-2 text-gray-700">
+                <li>各回とも<strong class="text-red-600">定員は5組</strong>となります。定員に達し次第、受付終了となります。</li>
+                <li>ご予約およびWebからのキャンセルは、<strong class="font-bold border-b border-gray-400">前日の17:00まで</strong>可能です。</li>
+                <li>当日のキャンセルにつきましては、お手数ですが<strong class="font-bold">お電話（042-742-1251）</strong>にてご連絡をお願いいたします。</li>
+                <li>ご予約後、確認メールを送信いたします。「@sagami.tokai.ed.jp」からのメールを受信できるように設定をお願いします。</li>
+            </ul>
+        </div>
+
+        <!-- Calendar Section -->
+        <div class="bg-white rounded-lg shadow-lg p-2 md:p-6 relative">
+            
+            <!-- ローディングオーバーレイ -->
+            <div id="calendar-loading" class="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-lg">
+                <div class="loader"></div>
+                <p class="text-sagami-blue font-bold mt-2">空き状況を取得しています...</p>
+            </div>
+
+            <div class="flex justify-between items-center mb-4 px-2">
+                <button id="prev-month" class="text-sagami-blue font-bold py-2 px-4 rounded hover:bg-blue-50 transition"><i class="fas fa-chevron-left"></i> 前の月</button>
+                <h2 id="current-month-display" class="text-xl md:text-2xl font-bold text-gray-800">2026年 7月</h2>
+                <button id="next-month" class="text-sagami-blue font-bold py-2 px-4 rounded hover:bg-blue-50 transition">次の月 <i class="fas fa-chevron-right"></i></button>
+            </div>
+
+            <div class="calendar-grid text-center font-bold text-sm md:text-base mb-2">
+                <div class="text-red-500 py-2">日</div>
+                <div class="py-2">月</div>
+                <div class="py-2">火</div>
+                <div class="py-2">水</div>
+                <div class="py-2">木</div>
+                <div class="py-2">金</div>
+                <div class="text-blue-500 py-2">土</div>
+            </div>
+            
+            <div id="calendar-body" class="calendar-grid">
+                <!-- JavaScriptでカレンダーを描画 -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Reservation Modal -->
+    <div id="reservation-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-sagami-blue text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg">見学予約フォーム</h3>
+                <button id="close-modal" class="text-white hover:text-gray-300 text-2xl leading-none">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <div class="bg-blue-50 text-sagami-blue p-3 rounded mb-6 text-center font-bold border border-blue-200">
+                    <span id="selected-date-display"></span> <br>
+                    <span id="selected-type-display" class="text-lg"></span>
+                </div>
+
+                <form id="reservation-form" class="space-y-4">
+                    <input type="hidden" id="hidden-date">
+                    <input type="hidden" id="hidden-type">
+                    <input type="hidden" id="hidden-time">
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">生徒氏名 <span class="text-red-500 text-xs ml-1">必須</span></label>
+                        <input type="text" id="student-name" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light" placeholder="東海 太郎">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">在籍中学校名 <span class="text-red-500 text-xs ml-1">必須</span></label>
+                        <input type="text" id="school-name" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light" placeholder="〇〇市立△△中学校">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">電話番号 <span class="text-red-500 text-xs ml-1">必須</span></label>
+                        <input type="tel" id="phone" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light" placeholder="090-1234-5678">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">メールアドレス <span class="text-red-500 text-xs ml-1">必須</span></label>
+                        <input type="email" id="email" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light" placeholder="example@email.com">
+                        <p class="text-xs text-gray-500 mt-1">※このアドレスに予約完了・キャンセル用リンクが届きます。</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">保護者同伴人数 <span class="text-red-500 text-xs ml-1">必須</span></label>
+                        <select id="accompany" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light bg-white">
+                            <option value="">選択してください</option>
+                            <option value="0">0人（生徒本人のみ）</option>
+                            <option value="1">1人</option>
+                            <option value="2">2人</option>
+                            <option value="3">3人以上</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">当日、特に知りたいこと <span class="text-gray-500 text-xs ml-1">任意</span></label>
+                        <textarea id="requests" rows="3" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:border-sagami-light focus:ring-1 focus:ring-sagami-light" placeholder="例：部活動（〇〇部）の様子が見たい、進路指導について詳しく聞きたい など"></textarea>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-200 mt-6">
+                        <button type="submit" id="submit-btn" class="w-full bg-sagami-blue hover:bg-sagami-light text-white font-bold py-3 px-4 rounded shadow transition flex justify-center items-center">
+                            この内容で予約する
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 予約完了メッセージ -->
+    <div id="success-message" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-sm w-full text-center">
+            <div class="text-green-500 text-5xl mb-4"><i class="fas fa-check-circle"></i></div>
+            <h3 class="text-xl font-bold mb-2">予約を受け付けました</h3>
+            <p class="text-sm text-gray-600 mb-6">ご入力いただいたメールアドレスに確認メールを送信しました。</p>
+            <button id="close-success" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded transition">閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 【重要】ここにGASで取得したウェブアプリのURLを貼り付けてください
+        // ==========================================
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbwmZDF7O1Xm8gaxtmeoZgFT-fA1jydE3cd3zltT_yR3lRoPsxfYmowABvI4l1Nn-UkD/exec";
+        
+        let currentYear = 2026;
+        let currentMonth = 6; // 0始まり (6 = 7月)
+        let serverAvailabilityData = {}; // サーバーから取得した空き状況を保持
+
+        const types = [
+            { id: 'jh', name: '中等部', time: '10:00', color: 'bg-green-600 hover:bg-green-500', textCol: 'text-white' },
+            { id: 'hs_am', name: '高校', time: '11:00', color: 'bg-blue-600 hover:bg-blue-500', textCol: 'text-white' },
+            { id: 'hs_pm', name: '高校', time: '14:00', color: 'bg-indigo-600 hover:bg-indigo-500', textCol: 'text-white' }
+        ];
+
+        // ページ読み込み時にGASから空き状況を取得
+        async function fetchAvailability() {
+            if (GAS_URL === "ここにウェブアプリのURLを貼り付けてください") {
+                // プレビュー用にローディングを消してアラートを出すだけにしておく
+                // alert("GAS_URLが設定されていません。コードを修正してください。");
+                document.getElementById('calendar-loading').classList.add('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(GAS_URL);
+                serverAvailabilityData = await response.json();
+                renderCalendar();
+            } catch (error) {
+                console.error("通信エラー:", error);
+                alert("空き状況の取得に失敗しました。時間をおいて再度お試しください。");
+            } finally {
+                // ローディング非表示
+                document.getElementById('calendar-loading').classList.add('hidden');
+            }
+        }
+
+        // カレンダー描画関数
+        function renderCalendar() {
+            const calendarBody = document.getElementById('calendar-body');
+            calendarBody.innerHTML = '';
+            
+            document.getElementById('current-month-display').innerText = `${currentYear}年 ${currentMonth + 1}月`;
+            
+            let date = new Date(currentYear, currentMonth, 1);
+            let firstDay = date.getDay();
+            let lastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+            
+            // 空白セル
+            for (let i = 0; i < firstDay; i++) {
+                calendarBody.innerHTML += `<div class="bg-gray-50 border border-gray-200 rounded p-1"></div>`;
+            }
+
+            // 日付セル
+            for (let day = 1; day <= lastDate; day++) {
+                let currentStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                let isWeekend = (new Date(currentYear, currentMonth, day).getDay() === 0 || new Date(currentYear, currentMonth, day).getDay() === 6);
+                let bgClass = isWeekend ? 'bg-gray-100' : 'bg-white';
+                
+                let cellHtml = `<div class="${bgClass} border border-gray-200 rounded p-1 md:p-2 date-cell flex flex-col h-full min-h-[120px]">
+                                    <div class="text-right text-sm md:text-base font-bold text-gray-600 mb-1">${day}</div>
+                                    <div class="flex-grow flex flex-col gap-1 justify-center">`;
+                
+                // サーバーから取得したデータに、この日付の設定が存在するかチェック
+                if (serverAvailabilityData[currentStr]) {
+                    types.forEach(type => {
+                        let status = serverAvailabilityData[currentStr][type.id];
+                        // status が undefiend の場合は、その枠の開催自体がない
+                        if (status !== undefined) {
+                            let statusMark = status === 1 ? '〇' : (status === 2 ? '△' : '✕');
+                            let disabled = status === 0 ? 'disabled' : '';
+                            let btnStyle = status === 0 ? 'bg-gray-300 text-gray-500' : type.color + ' ' + type.textCol;
+                            
+                            cellHtml += `
+                                <button onclick="openModal('${currentStr}', '${type.id}', '${type.name}', '${type.time}')" 
+                                        ${disabled}
+                                        class="slot-btn w-full text-xs md:text-sm py-1 px-1 rounded flex justify-between items-center ${btnStyle}">
+                                    <span class="font-bold truncate">${type.name}</span>
+                                    <span class="text-[0.65rem] md:text-xs bg-black bg-opacity-20 px-1 rounded">${type.time}</span>
+                                    <span class="font-bold bg-white text-gray-800 rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[0.6rem] md:text-xs">${statusMark}</span>
+                                </button>
+                            `;
+                        }
+                    });
+                } else {
+                    // スケジュール設定がない日
+                    cellHtml += `</div>`;
+                }
+                
+                cellHtml += `</div></div>`;
+                calendarBody.innerHTML += cellHtml;
+            }
+        }
+
+        // 月切り替えボタン
+        document.getElementById('prev-month').addEventListener('click', () => {
+            currentMonth--;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        });
+
+        document.getElementById('next-month').addEventListener('click', () => {
+            currentMonth++;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            renderCalendar();
+        });
+
+
+        // モーダル制御
+        const modal = document.getElementById('reservation-modal');
+        const successModal = document.getElementById('success-message');
+        
+        function openModal(dateStr, typeId, typeName, time) {
+            const dateObj = new Date(dateStr);
+            const days = ['日', '月', '火', '水', '木', '金', '土'];
+            const formattedDate = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日（${days[dateObj.getDay()]}）`;
+
+            document.getElementById('selected-date-display').innerText = formattedDate;
+            document.getElementById('selected-type-display').innerText = `${typeName} （${time}〜）`;
+            
+            document.getElementById('hidden-date').value = dateStr;
+            document.getElementById('hidden-type').value = typeId; // id(jh, hs_am等)を送信
+            document.getElementById('hidden-time').value = time;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        document.getElementById('close-modal').addEventListener('click', () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        });
+
+        // フォーム送信（GASへのPOSTリクエスト）
+        document.getElementById('reservation-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>送信中...';
+
+            const payload = {
+                date: document.getElementById('hidden-date').value,
+                type: document.getElementById('hidden-type').value,
+                name: document.getElementById('student-name').value,
+                school: document.getElementById('school-name').value,
+                phone: document.getElementById('phone').value,
+                email: document.getElementById('email').value,
+                accompany: document.getElementById('accompany').value,
+                requests: document.getElementById('requests').value
+            };
+
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    // GASでCORSエラーを回避するために text/plain を使用
+                    headers: { 'Content-Type': 'text/plain' }, 
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+
+                if (result.success) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                    
+                    successModal.classList.remove('hidden');
+                    successModal.classList.add('flex');
+                } else {
+                    alert('予約に失敗しました：\n' + result.message);
+                }
+            } catch (error) {
+                console.error("通信エラー:", error);
+                alert('通信エラーが発生しました。インターネット接続を確認してください。');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'この内容で予約する';
+            }
+        });
+
+        document.getElementById('close-success').addEventListener('click', () => {
+            successModal.classList.add('hidden');
+            successModal.classList.remove('flex');
+            document.getElementById('reservation-form').reset();
+            
+            // カレンダーの空き状況を再取得・再描画
+            document.getElementById('calendar-loading').classList.remove('hidden');
+            fetchAvailability();
+        });
+
+        // 初期化（ページ読み込み時に実行）
+        fetchAvailability();
+    </script>
+</body>
+</html>
