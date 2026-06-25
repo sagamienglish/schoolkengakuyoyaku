@@ -21,7 +21,8 @@
     </script>
     <style>
         body { font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; background-color: #f8fafc; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        /* コンテンツの幅に関わらず強制的に7等分にするために minmax(0, 1fr) を使用 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
         @media (max-width: 768px) {
             .calendar-grid { gap: 2px; }
             .date-cell { min-height: 100px; padding: 2px !important; }
@@ -53,9 +54,9 @@
         </div>
     </header>
 
-    <main class="container mx-auto px-4 py-8 max-w-5xl">
+    <main class="container mx-auto px-2 md:px-4 py-8 max-w-5xl">
         
-        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-8">
+        <div class="bg-white rounded-lg shadow-lg p-4 md:p-6 mb-8 mx-1">
             <h2 class="text-lg font-bold border-b-2 border-sagami-blue pb-2 mb-4 text-sagami-blue">
                 <i class="fas fa-info-circle mr-2"></i>ご案内と注意事項
             </h2>
@@ -64,12 +65,11 @@
                 <li>ご予約およびWebからのキャンセルは、<strong class="font-bold border-b border-gray-400">前日の17:00まで</strong>可能です。</li>
                 <li>当日のキャンセルにつきましては、お手数ですが<strong class="font-bold">お電話（042-742-1251）</strong>にてご連絡をお願いいたします。</li>
                 <li>ご予約後、確認メールを送信いたします。「@sagami.tokai.ed.jp」からのメールを受信できるように設定をお願いします。</li>
-                <li>通信環境やブラウザの設定により、送信後にエラー画面になる場合がありますが、予約完了メールが届いていれば予約は正常に完了しています。</li>
             </ul>
         </div>
 
         <!-- Calendar Section -->
-        <div class="bg-white rounded-lg shadow-lg p-2 md:p-6 relative">
+        <div class="bg-white rounded-lg shadow-lg p-2 md:p-6 relative mx-1">
             
             <!-- ローディングオーバーレイ -->
             <div id="calendar-loading" class="absolute inset-0 bg-white bg-opacity-80 z-10 flex flex-col items-center justify-center rounded-lg">
@@ -78,19 +78,13 @@
             </div>
 
             <div class="flex justify-between items-center mb-4 px-2">
-                <button id="prev-month" class="text-sagami-blue font-bold py-2 px-4 rounded hover:bg-blue-50 transition"><i class="fas fa-chevron-left"></i> 前の月</button>
-                <h2 id="current-month-display" class="text-xl md:text-2xl font-bold text-gray-800">2026年 7月</h2>
-                <button id="next-month" class="text-sagami-blue font-bold py-2 px-4 rounded hover:bg-blue-50 transition">次の月 <i class="fas fa-chevron-right"></i></button>
+                <button id="prev-month" class="text-sagami-blue font-bold py-2 px-2 md:px-4 rounded hover:bg-blue-50 transition"><i class="fas fa-chevron-left"></i> 前月</button>
+                <h2 id="current-month-display" class="text-lg md:text-2xl font-bold text-gray-800">2026年 7月</h2>
+                <button id="next-month" class="text-sagami-blue font-bold py-2 px-2 md:px-4 rounded hover:bg-blue-50 transition">次月 <i class="fas fa-chevron-right"></i></button>
             </div>
 
             <div class="calendar-grid text-center font-bold text-sm md:text-base mb-2">
-                <div class="text-red-500 py-2">日</div>
-                <div class="py-2">月</div>
-                <div class="py-2">火</div>
-                <div class="py-2">水</div>
-                <div class="py-2">木</div>
-                <div class="py-2">金</div>
-                <div class="text-blue-500 py-2">土</div>
+                <div class="text-red-500 py-1">日</div><div class="py-1">月</div><div class="py-1">火</div><div class="py-1">水</div><div class="py-1">木</div><div class="py-1">金</div><div class="text-blue-500 py-1">土</div>
             </div>
             
             <div id="calendar-body" class="calendar-grid">
@@ -180,7 +174,7 @@
         // ==========================================
         // 【重要】ここにGASで取得したウェブアプリのURLを貼り付けてください
         // ==========================================
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbwmZDF7O1Xm8gaxtmeoZgFT-fA1jydE3cd3zltT_yR3lRoPsxfYmowABvI4l1Nn-UkD/exec";
+        const GAS_URL = "ここにウェブアプリのURLを貼り付けてください";
         
         let currentYear = 2026;
         let currentMonth = 6; // 0始まり (6 = 7月)
@@ -196,8 +190,16 @@
         async function fetchAvailability() {
             if (GAS_URL === "ここにウェブアプリのURLを貼り付けてください") {
                 // プレビュー用にローディングを消してアラートを出すだけにしておく
-                // alert("GAS_URLが設定されていません。コードを修正してください。");
                 document.getElementById('calendar-loading').classList.add('hidden');
+                
+                // プレビュー用のダミーデータをセット
+                console.log("GAS_URL未設定のため、プレビュー用のダミーデータを表示します。");
+                serverAvailabilityData = {
+                    "2026-07-21": { "jh": 1, "hs_am": 1, "hs_pm": 1 },
+                    "2026-07-22": { "jh": 1, "hs_am": 2, "hs_pm": 1 },
+                    "2026-07-23": { "jh": 0, "hs_am": 1, "hs_pm": 1 }
+                };
+                renderCalendar();
                 return;
             }
 
@@ -250,13 +252,16 @@
                             let disabled = status === 0 ? 'disabled' : '';
                             let btnStyle = status === 0 ? 'bg-gray-300 text-gray-500' : type.color + ' ' + type.textCol;
                             
+                            // スマホ幅ではボタン内の要素を縦並び（flex-col）にし、はみ出しを防ぐ
                             cellHtml += `
                                 <button onclick="openModal('${currentStr}', '${type.id}', '${type.name}', '${type.time}')" 
                                         ${disabled}
-                                        class="slot-btn w-full text-xs md:text-sm py-1 px-1 rounded flex justify-between items-center ${btnStyle}">
-                                    <span class="font-bold truncate">${type.name}</span>
-                                    <span class="text-[0.65rem] md:text-xs bg-black bg-opacity-20 px-1 rounded">${type.time}</span>
-                                    <span class="font-bold bg-white text-gray-800 rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[0.6rem] md:text-xs">${statusMark}</span>
+                                        class="slot-btn w-full text-xs md:text-sm py-1 px-1 rounded flex flex-col md:flex-row justify-between items-center ${btnStyle}">
+                                    <span class="font-bold truncate w-full text-center md:text-left">${type.name}</span>
+                                    <div class="flex items-center justify-center md:justify-end w-full mt-1 md:mt-0 space-x-1">
+                                        <span class="text-[0.6rem] md:text-xs bg-black bg-opacity-20 px-1 rounded whitespace-nowrap">${type.time}</span>
+                                        <span class="font-bold bg-white text-gray-800 rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[0.6rem] md:text-xs flex-shrink-0">${statusMark}</span>
+                                    </div>
                                 </button>
                             `;
                         }
@@ -314,6 +319,11 @@
         document.getElementById('reservation-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            if (GAS_URL === "https://script.google.com/macros/s/AKfycbwmZDF7O1Xm8gaxtmeoZgFT-fA1jydE3cd3zltT_yR3lRoPsxfYmowABvI4l1Nn-UkD/exec") {
+                alert("これはプレビュー画面です。実際の送信は行われません。");
+                return;
+            }
+
             const submitBtn = document.getElementById('submit-btn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>送信中...';
