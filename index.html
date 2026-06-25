@@ -170,6 +170,31 @@
         </div>
     </div>
 
+    <!-- タイムアウト・通信遮断時の確認案内メッセージ -->
+    <div id="error-message" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full border-t-4 border-yellow-500">
+            <div class="text-center mb-4">
+                <div class="text-yellow-500 text-5xl mb-2"><i class="fas fa-exclamation-triangle"></i></div>
+                <h3 class="text-lg md:text-xl font-bold text-gray-800">通信の確認をお願いします</h3>
+            </div>
+            <div class="text-sm md:text-base text-gray-700 mb-6 space-y-3">
+                <p>お使いのブラウザや通信環境の設定により、画面の切り替えが中断されました。</p>
+                <p class="font-bold text-red-600 bg-red-50 p-2 rounded">
+                    ただし、裏側でのご予約手続き自体は完了している可能性が高い状態です。
+                </p>
+                <p>
+                    ご入力いただいたメールアドレス宛に<strong>「予約完了メール」が届いているかご確認ください。</strong>メールが届いていれば、ご予約は正常に完了しております。
+                </p>
+                <p class="text-xs text-gray-500 mt-2">
+                    ※数分待ってもメールが届かない場合は、大変お手数ですが別のブラウザ（Google Chrome等）で再度お試しいただくか、お電話にてお問い合わせください。
+                </p>
+            </div>
+            <div class="text-center">
+                <button id="close-error" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-8 rounded transition">確認しました</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==========================================
         // 【重要】ここにGASで取得したウェブアプリのURLを貼り付けてください
@@ -188,21 +213,6 @@
 
         // ページ読み込み時にGASから空き状況を取得
         async function fetchAvailability() {
-            if (GAS_URL === "https://script.google.com/macros/s/AKfycbwrLYsUjnbun-eG12_ITiSK08PNtBmbLOs9yR1Do0dLvREiIFkbqoaiEmANRtbaOM0t/exec") {
-                // プレビュー用にローディングを消してアラートを出すだけにしておく
-                document.getElementById('calendar-loading').classList.add('hidden');
-                
-                // プレビュー用のダミーデータをセット
-                console.log("GAS_URL未設定のため、プレビュー用のダミーデータを表示します。");
-                serverAvailabilityData = {
-                    "2026-07-21": { "jh": 1, "hs_am": 1, "hs_pm": 1 },
-                    "2026-07-22": { "jh": 1, "hs_am": 2, "hs_pm": 1 },
-                    "2026-07-23": { "jh": 0, "hs_am": 1, "hs_pm": 1 }
-                };
-                renderCalendar();
-                return;
-            }
-
             try {
                 const response = await fetch(GAS_URL);
                 serverAvailabilityData = await response.json();
@@ -293,6 +303,7 @@
         // モーダル制御
         const modal = document.getElementById('reservation-modal');
         const successModal = document.getElementById('success-message');
+        const errorModal = document.getElementById('error-message');
         
         function openModal(dateStr, typeId, typeName, time) {
             const dateObj = new Date(dateStr);
@@ -319,11 +330,6 @@
         document.getElementById('reservation-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (GAS_URL === "https://script.google.com/macros/s/AKfycbwmZDF7O1Xm8gaxtmeoZgFT-fA1jydE3cd3zltT_yR3lRoPsxfYmowABvI4l1Nn-UkD/exec") {
-                alert("これはプレビュー画面です。実際の送信は行われません。");
-                return;
-            }
-
             const submitBtn = document.getElementById('submit-btn');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>送信中...';
@@ -339,14 +345,19 @@
                 requests: document.getElementById('requests').value
             };
 
+            // タイムアウト設定 (8秒で強制終了)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
             try {
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
-                    // GASでCORSエラーを回避するために text/plain を使用
                     headers: { 'Content-Type': 'text/plain' }, 
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal: controller.signal // タイムアウト用シグナル
                 });
                 
+                clearTimeout(timeoutId); // 正常に返事が来たらタイマーを解除
                 const result = await response.json();
 
                 if (result.success) {
@@ -359,20 +370,40 @@
                     alert('予約に失敗しました：\n' + result.message);
                 }
             } catch (error) {
-                console.error("通信エラー:", error);
-                alert('通信エラーが発生しました。インターネット接続を確認してください。');
+                console.error("通信エラーまたはタイムアウト:", error);
+                
+                // フォームモーダルを閉じる
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                
+                // 注意喚起用エラーモーダルを表示する
+                errorModal.classList.remove('hidden');
+                errorModal.classList.add('flex');
+                
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'この内容で予約する';
+                clearTimeout(timeoutId); // 念のためタイマー解除
             }
         });
 
+        // 成功モーダルを閉じる処理
         document.getElementById('close-success').addEventListener('click', () => {
             successModal.classList.add('hidden');
             successModal.classList.remove('flex');
             document.getElementById('reservation-form').reset();
             
-            // カレンダーの空き状況を再取得・再描画
+            document.getElementById('calendar-loading').classList.remove('hidden');
+            fetchAvailability();
+        });
+
+        // エラー（確認案内）モーダルを閉じる処理
+        document.getElementById('close-error').addEventListener('click', () => {
+            errorModal.classList.add('hidden');
+            errorModal.classList.remove('flex');
+            document.getElementById('reservation-form').reset();
+            
+            // 予約が通っていた場合に備え、カレンダーを再取得して状況を最新化する
             document.getElementById('calendar-loading').classList.remove('hidden');
             fetchAvailability();
         });
